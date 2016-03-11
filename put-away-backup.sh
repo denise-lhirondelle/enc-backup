@@ -17,7 +17,7 @@ function get_real_path {
         return 1
     fi
 
-    echo "`realpath $1`"
+    echo "$(cd "$(dirname "$1")"; pwd)/$(basename "$1")"
 }
 
 function make_pem_files {
@@ -33,13 +33,13 @@ function make_pem_files {
         return 1
     fi
 
-    if [ -f `${private_key}.pem` ]; then
+    if [ -f "${private_key}.pem" ]; then
         echo "${private_key}.pem already exists; I will not overwrite it."
     else
         openssl rsa -in $private_key -outform pem > ${private_key}.pem
     fi
 
-    if [ -f `${private_key}.pub.pem` ]; then
+    if [ -f "${private_key}.pub.pem" ]; then
         echo "${private_key}.pub.pem already exists; I will not overwrite it."
     else
         openssl rsa -in $private_key -pubout -outform pem > ${private_key}.pub.pem
@@ -115,6 +115,9 @@ case "$1" in
         ;;
     decrypt)
         decrypt_file $2 $3
+        ;;
+    test)
+        get_real_path $2
         ;;
     *)
         usage
