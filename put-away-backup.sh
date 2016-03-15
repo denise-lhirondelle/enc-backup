@@ -102,6 +102,38 @@ function setup {
     create_conf_file 
 }
 
+
+function create_folders {
+    local destination=$1
+    local project_string=$2
+    OLD_IFS=$IFS
+    IFS=','
+    local project_names=$project_string
+
+    # First, create the main folder
+    if [ ! -d $destination ]; then
+        mkdir $destination
+    fi
+
+    for current_project in $project_names; do
+        echo "From create_folders: $current_project"
+    done
+
+    # Then set up folders for each project
+    for current_project in $project_names; do
+        if [ ! -d $destination/$current_project ]; then
+            echo "Creating folders for $current_project"
+            echo "Creating $destination/$current_project/production"
+            mkdir -p $destination/$current_project/production
+            echo "Creating $destination/$current_project/development"
+            mkdir $destination/$current_project/development
+        else
+            echo "Folders for $current_project already exist"
+        fi
+    done
+    IFS=$OLD_IFS
+}
+
 function configure_remote {
     local destination=$1
     local project_names=$2
@@ -109,26 +141,7 @@ function configure_remote {
     local remote_machine=${destination:0: ${divider_index}-1}
     destination=${destination:${divider_index}}
 
-    ssh $remote_machine "$(typeset -f); echo $destination; create_folders $destination $project_names"
-}
-
-function create_folders {
-    local destination=$1
-    local project_names=$2
-
-    # First, create the main folder
-    if [ ! -d $destination ]; then
-        mkdir $destination
-    fi
-
-    # Then set up folders for each project
-    for current_project in "${project_names[@]}"; do
-        if [ ! -d $destination/$current_project ]; then
-            mkdir -p $destination/$current_project/production
-            mkdir $destination/$current_project/development
-            echo "Created folders for $current_project"
-        fi
-    done
+    ssh $remote_machine "$(typeset -f); create_folders $destination \"$project_names\""
 }
 
 function run_config_file {
@@ -137,7 +150,6 @@ function run_config_file {
     fi
 
     local line_counter=1
-    local project_counter=0
     local config_section
     local project_names
     while read line; do
@@ -157,8 +169,11 @@ function run_config_file {
         if [ "$config_section" == "Destination" ]; then
             local destination=$line
         elif [ "$config_section" == "Project Names" ]; then
-            project_names[$project_counter]=$line
-            ((project_counter++))
+            if [ -z $project_names ]; then
+                project_names=$line
+            else
+                project_names="$project_names,$line"
+            fi
         fi
 
         ((line_counter++))
