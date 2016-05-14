@@ -187,19 +187,10 @@ function run_config_file {
 }
 
 function encrypt_file {
-    if [ -z $1 ]; then
-        echo "Error: first argument must be file_name.pub.pem"
-        return 1
-    fi
 
-    if [ -z $2 ]; then
-        echo "Error: no file specified."
-        return 1
-    fi
-
-    local public_pem=`get_real_path $1`
-    local key_file=`get_real_path ${public_pem:0: -8}`
-    local file_name=`get_real_path $2`
+    local public_pem=$1
+    local key_file=$2
+    local file_name=$3
 
     if [ ! -f $public_pem ]; then
         echo "$public_pem does not exist."
@@ -216,27 +207,101 @@ function encrypt_file {
         return 1
     fi
 
-    if openssl rsautl -encrypt -inkey $public_pem  -pubin -in $key_file -out ${key_file}.enc \
+    if openssl rsautl -encrypt -inkey $public_pem -pubin -in $key_file -out ${key_file}.enc \
         && openssl enc -aes-256-cbc -salt -in $file_name -out ${file_name}.enc -pass file:$key_file; then
         printf "%s\n" "Created ${key_file}.enc ${file_name}.enc."
     else
         echo "Error: could not create ${key_file}.enc ${file_name}.enc."
     fi
-
-    put_file_away ${file_name}.enc
 }
 
-function put_file_away {
-    line_counter=1
-    while read line;do
-        echo "$line"
-        #if [ $line != "Destination" ]; then
-            # backup_destination=$line
-        #fi
+function get_config_list() {
+    if [ -z "$1" ]; then
+        echo "No config file specified"
+        exit 1
+    fi
+
+    if [ -z "$2" ]; then
+        echo "No section specified"
+        exit 1
+    fi
+
+    local config=$1 
+    local section=$2
+    local found_them=false
+    local line_counter=1
+    local list_holder=''
+    while read line; do
+        # Don't need comments and empty lines
+        if [ "${line:0:1}" == '#' ] || [ -z "$line" ]; then
+            continue
+        fi
+
+        # Get the lines from the right category
+        if [ $found_them == true ] && [ "${line:0:1}" != '[' ]; then
+            list_holder="$list_holder $line"
+        elif [ "$line" == "$section" ]; then
+            found_them=true
+        else
+            continue
+        fi
         ((line_counter++))
-    done < $HOME/.www-db-backup.conf
+    done < $config
+    echo $list_holder
+}
+
+# In development
+function sync_backups {
+    if [ -z $1 ]; then
+        echo "Error: first argument must be file_name.enc"
+        return 1
+    fi
+
+    dest=`get_config_list $HOME/.www-db-backup.conf "[Destination]"`
+    backup_root=`get_config_list $HOME/.www-db-backup.conf "[Root Folder]"`
+
     # TODO: send the encrypted file to Gerhard
-    # scp $1 $backup_destination
+    #rsync -a \
+    #    --progress \
+
+}
+
+#function get_project_name() {
+#    folders=`get_config_list $HOME/.www-db-backup.conf "[Project Names]"`
+#}
+
+function backup_and_store {
+    if [ -z $1 ]; then
+        echo "Error: first argument must be file_name.pub.pem"
+        return 1
+    fi
+
+    #if [ -z $2 ]; then
+    #    echo "Error: no file specified."
+    #    return 1
+    #fi
+
+    local public_pem=`get_real_path $1`
+    #local key_file=`get_real_path ${public_pem:0: -8}`
+    #local file_name=`get_real_path $2`
+
+    # TODO: get stuff like this into an object that is initialized when
+    # the script is run
+    backup_root=`get_config_list $HOME/.www-db-backup.conf "[Root Folder]"`
+
+    # Get project name
+    OLD_IFS=$IFS
+    IFS='/'
+    split_path=$public_pem
+    for dir in $split_path; do
+        echo $dir
+    done
+    IFS=$OLD_IFS
+
+    #if encrypt_file $public_pem $key_file $file_name; then
+    #    mv ${file_name}.enc $backup_root
+    #    sync_backups 
+    #fi
 }
 
 function decrypt_file {
@@ -274,14 +339,15 @@ case "$1" in
         run_config_file $2
         ;;
     encrypt)
-        encrypt_file $2 $3
+        backup_and_store $2 $3
         ;;
     decrypt)
         decrypt_file $2 $3
         ;;
     test)
-        run_config_file $2
-        # put_file_away 
+        # run_config_file $2
+        # sync_backups
+        backup_and_store $2
         ;;
     *)
         usage
