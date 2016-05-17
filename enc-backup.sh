@@ -66,19 +66,28 @@ else
     echo "Error: config file has not been created"
 fi
 
+function sanitize_file_arg {
+    if [ -z "$1" ]; then
+        echo "Error: argument must be file name"
+        exit 1
+    fi
+
+    local file=`get_full_path $1`
+
+    if [ ! -e "$file" ]; then
+        echo "Error: file does not exist"
+        exit 1
+    fi
+
+    echo $file
+}
+
 function get_backup_path {
     # Get the project-name/folder path of a file
     # This path begins from $backup_root
 
-    # Marked to move
-    if [ ! -e "$1" ]; then
-        echo "Error: first argument must be an existing file name"
-        exit 1
-    fi
-
-    # Marked to move
-    local full_path=`get_full_path $1`
-
+    local full_path=`sanitize_file_arg $1`
+    
     if [ "${full_path/$backup_root}" == "$full_path" ]; then
         echo "Error: file is not located in backup folder"
     else
@@ -91,14 +100,7 @@ function move_to_sync_folder {
     # Moves encrypted file to local sync folder
     # From there, it can be rsynced with remote
 
-    # Marked to move
-    if [ -z "$1" ]; then
-        echo "Error: first argument must be the unencrypted file"
-        exit 1
-    fi
-
-    # Marked to change
-    local full_path=$(get_full_path $1)
+    local full_path=`sanitize_file_arg $1`
 
     if [ ! -e $full_path.enc ]; then
         echo "Error: file $1.enc does not exist"
@@ -113,13 +115,7 @@ function move_to_sync_folder {
 
 function encrypt {
 
-    # Marked to move
-    if [ ! -e "$1" ]; then
-        echo "Error: first argument must be filename to be encrypted"
-        exit 1
-    fi
-
-    local file_name=$1
+    local file_name=`sanitize_file_arg $1`
 
     if openssl enc -aes-256-cbc -salt -in $file_name -out $file_name.enc -pass file:$key_file; then
         printf "%s\n" "Created ${file_name}.enc"
@@ -129,14 +125,7 @@ function encrypt {
 }
 
 function decrypt {
-
-    # Marked to move
-    if [ ! -e "$1" ]; then
-        echo "Error: first argument must be filename to be decrypted"
-        exit 1
-    fi
-
-    local enc_file=$1
+    local enc_file=`sanitize_file_arg $1`
     local decrypted_file=${enc_file:0:-4}
 
     if openssl enc -d -aes-256-cbc -in $enc_file -out $decrypted_file -pass file:$key_file; then
@@ -155,10 +144,14 @@ function sync_encrypted {
         $enc_dest
 }
 
-# Test
-#encrypt $1
-#move_to_sync_folder $1
-#sync_encrypted
+function get_from_remote {
+    # Restores encrypted files from remote folder
+    rsync -a \
+        --verbose \
+        --progress \
+        $enc_dest/ \
+        $enc_src 
+}
 
 #function create_conf_file {
 #    # Currently, this assumes that the base configuration 
