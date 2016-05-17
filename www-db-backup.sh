@@ -1,5 +1,35 @@
 #!/bin/bash
 
+# Encrypts backups and sends them to remote 
+
+function get_full_path {
+    # Gets absolute path of a file
+    # From https://gist.github.com/TheMengzor/968e5ea87e99d9c41782
+
+    if [ -z $1 ]; then
+        echo "First argument must be a filename"
+        return 1
+    fi
+
+    local file_path=$1
+
+    while [ -h "$file_path" ]; do
+        local real_dir="$(cd -P "$(dirname "$file_path")" && pwd)"
+        local file_path="$(readlink "$file_path")"
+        [[ $file_path != /* ]] && file_path="$real_dir/$file_path"
+    done
+
+    echo "$(cd "$(dirname "$file_path")"; pwd)/$(basename "$file_path")"
+}
+
+script_path=`get_full_path ${BASH_SOURCE[0]}`
+script_dir=`dirname $script_path`
+
+source $script_dir/lib/init_from_conf.sh
+
+config=$HOME/.db-backup.conf
+init_from_conf $config
+
 #config_file=$HOME/.www-db-backup.conf
 #
 #function usage {
@@ -8,16 +38,7 @@
 #    printf "%s  %s\n" "Encrypt a file:" "$0 encrypt key.pub.pem filename"
 #    printf "%s  %s\n" "Decrypt a file:" "$0 encrypt key.pem filename"
 #}
-#
-#function get_real_path {
-#    if [ -z $1 ]; then
-#        echo "Usage $0 setup private_key"
-#        return 1
-#    fi
-#
-#    echo "$(cd "$(dirname "$1")"; pwd)/$(basename "$1")"
-#}
-#
+
 #function create_conf_file {
 #    # Currently, this assumes that the base configuration 
 #    # file is in the same directory as the script
@@ -264,10 +285,6 @@
 #
 #}
 #
-##function get_project_name() {
-##    folders=`get_config_list $HOME/.www-db-backup.conf "[Project Names]"`
-##}
-#
 #function backup_and_store {
 #    if [ -z $1 ]; then
 #        echo "Error: first argument must be file_name.pub.pem"
@@ -330,12 +347,6 @@
 #}
 #
 #case "$1" in
-#    setup)
-#        setup $2
-#        ;;
-#    config)
-#        run_config_file $2
-#        ;;
 #    encrypt)
 #        backup_and_store $2 $3
 #        ;;
