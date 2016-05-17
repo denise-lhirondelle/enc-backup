@@ -28,7 +28,7 @@ default_config=$script_dir/enc-backup.conf
 
 source $script_dir/lib/init_from_config.sh
 
-conf=$HOME/.enc-backup.conf
+config=$HOME/.enc-backup.conf
 if [ -e $config ]; then
     init_from_config $config
 else
