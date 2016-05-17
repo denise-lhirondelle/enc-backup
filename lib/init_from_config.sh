@@ -1,6 +1,6 @@
 #!/bin/bash
 
-function init_from_confif {
+function init_from_config {
     # Reads config file and sets settings from the file
     # Taken from:
     # http://mywiki.wooledge.org/glob
