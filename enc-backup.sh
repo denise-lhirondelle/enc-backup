@@ -66,9 +66,54 @@ else
     echo "Error: config file has not been created"
 fi
 
-function encrypt {
-    # Adapted from http://www.czeskis.com/random/openssl-encrypt-file.html
+function get_backup_path {
+    # Get the project-name/folder path of a file
+    # This path begins from $backup_root
 
+    # Marked to move
+    if [ ! -e "$1" ]; then
+        echo "Error: first argument must be an existing file name"
+        exit 1
+    fi
+
+    # Marked to move
+    local full_path=`get_full_path $1`
+
+    if [ "${full_path/$backup_root}" == "$full_path" ]; then
+        echo "Error: file is not located in backup folder"
+    else
+        local backup_path=${full_path/$backup_root}
+        echo ${backup_path:1}
+    fi
+}
+
+function move_to_sync_folder {
+    # Moves encrypted file to local sync folder
+    # From there, it can be rsynced with remote
+
+    # Marked to move
+    if [ -z "$1" ]; then
+        echo "Error: first argument must be the unencrypted file"
+        exit 1
+    fi
+
+    # Marked to change
+    local full_path=$(get_full_path $1)
+
+    if [ ! -e $full_path.enc ]; then
+        echo "Error: file $1.enc does not exist"
+        echo "Please encrypt file before moving it"
+        exit 1
+    fi
+
+    mv $full_path.enc $enc_src/`get_backup_path $full_path`.enc
+}
+
+# Encrypt/decrypt adapted from http://www.czeskis.com/random/openssl-encrypt-file.html
+
+function encrypt {
+
+    # Marked to move
     if [ ! -e "$1" ]; then
         echo "Error: first argument must be filename to be encrypted"
         exit 1
@@ -84,6 +129,8 @@ function encrypt {
 }
 
 function decrypt {
+
+    # Marked to move
     if [ ! -e "$1" ]; then
         echo "Error: first argument must be filename to be decrypted"
         exit 1
@@ -92,8 +139,26 @@ function decrypt {
     local enc_file=$1
     local decrypted_file=${enc_file:0:-4}
 
-    openssl enc -d -aes-256-cbc -in $enc_file -out $decrypted_file -pass file:$key_file
+    if openssl enc -d -aes-256-cbc -in $enc_file -out $decrypted_file -pass file:$key_file; then
+        echo "File has been decrypted. See $decrypted_file"
+    else
+        echo "Error: could not decrypt file"
+    fi
 }
+
+function sync_encrypted {
+    # Syncs local encrypted files with remote encrypted files
+    rsync -a \
+        --verbose \
+        --progress \
+        $enc_src/ \
+        $enc_dest
+}
+
+# Test
+#encrypt $1
+#move_to_sync_folder $1
+#sync_encrypted
 
 #function create_conf_file {
 #    # Currently, this assumes that the base configuration 
