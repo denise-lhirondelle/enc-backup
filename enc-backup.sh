@@ -1,6 +1,12 @@
 #!/bin/bash
 
 # Encrypts backups and sends them to remote 
+#function usage {
+#    printf "%s\n" "To use:"
+#    printf "%s  %s\n" "Setup:" "$0 setup /path/to/private.key"
+#    printf "%s  %s\n" "Encrypt a file:" "$0 encrypt key.pub.pem filename"
+#    printf "%s  %s\n" "Decrypt a file:" "$0 encrypt key.pem filename"
+#}
 
 function get_full_path {
     # Gets absolute path of a file
@@ -22,29 +28,72 @@ function get_full_path {
     echo "$(cd "$(dirname "$file_path")"; pwd)/$(basename "$file_path")"
 }
 
+    
 script_path=`get_full_path ${BASH_SOURCE[0]}`
 script_dir=`dirname $script_path`
 default_config=$script_dir/enc-backup.conf
 
-source $script_dir/lib/init_from_config.sh
+#source $script_dir/lib/init_from_config.sh
 
 config=$HOME/.enc-backup.conf
 if [ -e $config ]; then
-    init_from_config $config
+    # Set settings from config file
+    # Taken from:
+    # http://mywiki.wooledge.org/glob
+    # http://stackoverflow.com/a/20815951
+
+    # TODO: does this work in shells other than Bash?
+    shopt -q extglob; extglob_set=$?
+    ((extglob_set)) && shopt -s extglob
+
+    tr -d '\r' < $config > $config.unix 
+
+    while IFS='= ' read lhs rhs
+    do
+        if [[ ! $lhs =~ ^\ *# && -n $lhs ]]; then
+            rhs="${rhs%%\#*}"    # Del in line right comments
+            rhs="${rhs%%*( )}"   # Del trailing spaces
+            rhs="${rhs%\"*}"     # Del opening string quotes 
+            rhs="${rhs#\"*}"     # Del closing string quotes 
+            declare $lhs="$rhs"
+        fi
+    done < $config.unix
+
+    # Clean up after ourselves
+    ((extglob_set)) && shopt -u extglob
+    rm $config.unix
 else
-    # Load some defaults
-    backup_root=$HOME/all-backups
-    enc_src=$backup_root/enc-backups
+    echo "Error: config file has not been created"
 fi
 
-#config_file=$HOME/.www-db-backup.conf
-#
-#function usage {
-#    printf "%s\n" "To use:"
-#    printf "%s  %s\n" "Setup:" "$0 setup /path/to/private.key"
-#    printf "%s  %s\n" "Encrypt a file:" "$0 encrypt key.pub.pem filename"
-#    printf "%s  %s\n" "Decrypt a file:" "$0 encrypt key.pem filename"
-#}
+function encrypt {
+    # Adapted from http://www.czeskis.com/random/openssl-encrypt-file.html
+
+    if [ ! -e "$1" ]; then
+        echo "Error: first argument must be filename to be encrypted"
+        exit 1
+    fi
+
+    local file_name=$1
+
+    if openssl enc -aes-256-cbc -salt -in $file_name -out $file_name.enc -pass file:$key_file; then
+        printf "%s\n" "Created ${file_name}.enc"
+    else
+        echo "Error: could not create ${file_name}.enc"
+    fi
+}
+
+function decrypt {
+    if [ ! -e "$1" ]; then
+        echo "Error: first argument must be filename to be decrypted"
+        exit 1
+    fi
+
+    local enc_file=$1
+    local decrypted_file=${enc_file:0:-4}
+
+    openssl enc -d -aes-256-cbc -in $enc_file -out $decrypted_file -pass file:$key_file
+}
 
 #function create_conf_file {
 #    # Currently, this assumes that the base configuration 
