@@ -32,7 +32,9 @@ config=$HOME/.enc-backup.conf
 if [ -e $config ]; then
     init_from_config $config
 else
-    init_from_config $default_config
+    # Load some defaults
+    backup_root=$HOME/all-backups
+    enc_src=$backup_root/enc-backups
 fi
 
 #config_file=$HOME/.www-db-backup.conf
