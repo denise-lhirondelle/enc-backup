@@ -30,9 +30,10 @@ source $script_dir/lib/init_from_config.sh
 
 conf=$HOME/.enc-backup.conf
 if [ -e $config ]; then
-    init_from_conf $conf
+    init_from_config $config
 else
-    init_from_conf $
+    init_from_config $default_config
+fi
 
 #config_file=$HOME/.www-db-backup.conf
 #
